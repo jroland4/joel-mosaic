@@ -1,6 +1,8 @@
+from typing import Any
+
 from pyspark.sql import Column
 from pyspark.sql.functions import _to_java_column as pyspark_to_java_column
-from pyspark.sql.functions import col
+from pyspark.sql.functions import lit
 
 from mosaic.config import config
 from mosaic.utils.types import ColumnOrName, as_typed_col
@@ -8,6 +10,42 @@ from mosaic.utils.types import ColumnOrName, as_typed_col
 #####################
 # Spatial functions #
 #####################
+
+__all__ = [
+    "st_area",
+    "st_length",
+    "st_perimeter",
+    "st_convexhull",
+    "st_buffer",
+    "st_dump",
+    "st_srid",
+    "st_setsrid",
+    "st_transform",
+    "st_hasvalidcoordinates",
+    "st_translate",
+    "st_scale",
+    "st_rotate",
+    "st_centroid2D",
+    "st_centroid3D",
+    "st_numpoints",
+    "st_isvalid",
+    "st_distance",
+    "st_intersection",
+    "st_geometrytype",
+    "st_xmin",
+    "st_xmax",
+    "st_ymin",
+    "st_ymax",
+    "st_zmin",
+    "st_zmax",
+    "flatten_polygons",
+    "point_index_geom",
+    "point_index_lonlat",
+    "index_geometry",
+    "polyfill",
+    "mosaic_explode",
+    "mosaicfill",
+]
 
 
 def st_area(geom: ColumnOrName) -> Column:
@@ -84,6 +122,28 @@ def st_convexhull(geom: ColumnOrName) -> Column:
     """
     return config.mosaic_context.invoke_function(
         "st_convexhull", pyspark_to_java_column(geom)
+    )
+
+
+def st_buffer(geom: ColumnOrName, radius: ColumnOrName) -> Column:
+    """
+    Compute the buffered geometry based on geom and radius.
+
+    Parameters
+    ----------
+    geom : Column
+        The input geometry
+    radius : Column
+        The radius of buffering
+
+    Returns
+    -------
+    Column
+        A geometry
+
+    """
+    return config.mosaic_context.invoke_function(
+        "st_buffer", pyspark_to_java_column(geom), pyspark_to_java_column(radius)
     )
 
 
@@ -179,6 +239,37 @@ def st_transform(geom: ColumnOrName, srid: ColumnOrName) -> Column:
     """
     return config.mosaic_context.invoke_function(
         "st_transform", pyspark_to_java_column(geom), pyspark_to_java_column(srid)
+    )
+
+
+def st_hasvalidcoordinates(
+    geom: ColumnOrName, crs: ColumnOrName, which: ColumnOrName
+) -> Column:
+    """
+    Checks if all points in geometry are valid with respect to crs bounds.
+    CRS bounds can be provided either as bounds or as reprojected_bounds.
+
+    Parameters
+    ----------
+    geom : Column
+        The input geometry
+    crs : Column (StringType)
+        The spatial reference system for `geom`, expressed as a string,
+        e.g. EPSG:3857
+    which : Column (StringType)
+        Either 'bounds' or 'reprojected_bounds' - controls how the check
+        is executed at runtime.
+
+    Returns
+    -------
+    Column
+        BooleanType - true if all points in geometry are within provided bounds.
+    """
+    return config.mosaic_context.invoke_function(
+        "st_hasvalidcoordinates",
+        pyspark_to_java_column(geom),
+        pyspark_to_java_column(crs),
+        pyspark_to_java_column(which),
     )
 
 
@@ -296,6 +387,25 @@ def st_centroid3D(geom: ColumnOrName) -> Column:
     )
 
 
+def st_numpoints(geom: ColumnOrName) -> Column:
+    """
+    Returns the number of points in `geom`.
+
+    Parameters
+    ----------
+    geom : Column
+        The input geometry
+
+    Returns
+    -------
+    Column (IntegerType)
+
+    """
+    return config.mosaic_context.invoke_function(
+        "st_numpoints", pyspark_to_java_column(geom)
+    )
+
+
 def st_isvalid(geom: ColumnOrName) -> Column:
     """
     Returns true if the geometry `geom` is valid.
@@ -320,28 +430,24 @@ def st_isvalid(geom: ColumnOrName) -> Column:
     )
 
 
-def st_intersects(left_geom: ColumnOrName, right_geom: ColumnOrName) -> Column:
+def st_distance(geom1: ColumnOrName, geom2: ColumnOrName) -> Column:
     """
-    Returns true if the geometry `left_geom` intersects `right_geom`.
+    Compute the distance between `geom1` and `geom2`.
 
     Parameters
     ----------
-    left_geom : Column
-    right_geom : Column
+    geom1 : Column
+    geom2 : Column
 
     Returns
     -------
-    Column (BooleanType)
-
-    Notes
-    -----
-    Intersection logic will be dependent on the chosen geometry API (ESRI or JTS).
+    Column (DoubleType)
 
     """
     return config.mosaic_context.invoke_function(
-        "st_intersects",
-        pyspark_to_java_column(left_geom),
-        pyspark_to_java_column(right_geom),
+        "st_distance",
+        pyspark_to_java_column(geom1),
+        pyspark_to_java_column(geom2),
     )
 
 
@@ -592,7 +698,9 @@ def polyfill(geom: ColumnOrName, resolution: ColumnOrName) -> Column:
     )
 
 
-def mosaic_explode(geom: ColumnOrName, resolution: ColumnOrName) -> Column:
+def mosaic_explode(
+    geom: ColumnOrName, resolution: ColumnOrName, keep_core_geometries: Any = True
+) -> Column:
     """
     Generates:
     - a set of core indices that are fully contained by `geom`; and
@@ -604,21 +712,29 @@ def mosaic_explode(geom: ColumnOrName, resolution: ColumnOrName) -> Column:
     ----------
     geom : Column
     resolution : Column (IntegerType)
+    keep_core_geometries : Column (BooleanType) | bool
 
     Returns
     -------
     Column (StructType[is_core: BooleanType, h3: LongType, wkb: BinaryType])
-        `wkb` in this struct represents a border chip geometry and is null for all 'core' chips.
+        `wkb` in this struct represents a border chip geometry and is null for all 'core' chips
+        if keep_core_geometries is set to False.
 
     """
+    if type(keep_core_geometries) == bool:
+        keep_core_geometries = lit(keep_core_geometries)
+
     return config.mosaic_context.invoke_function(
         "mosaic_explode",
         pyspark_to_java_column(geom),
         pyspark_to_java_column(resolution),
+        pyspark_to_java_column(keep_core_geometries),
     )
 
 
-def mosaicfill(geom: ColumnOrName, resolution: ColumnOrName) -> Column:
+def mosaicfill(
+    geom: ColumnOrName, resolution: ColumnOrName, keep_core_geometries: Any = True
+) -> Column:
     """
     Generates:
     - a set of core indices that are fully contained by `geom`; and
@@ -630,15 +746,22 @@ def mosaicfill(geom: ColumnOrName, resolution: ColumnOrName) -> Column:
     ----------
     geom : Column
     resolution : Column (IntegerType)
+    keep_core_geometries : Column (BooleanType) | bool
 
     Returns
     -------
     Column (ArrayType[StructType[is_core: BooleanType, h3: LongType, wkb: BinaryType]])
-        `wkb` in this struct represents a border chip geometry and is null for all 'core' chips.
+        `wkb` in this struct represents a border chip geometry and is null for all 'core' chips
+        if keep_core_geometries is set to False.
 
     """
+
+    if type(keep_core_geometries) == bool:
+        keep_core_geometries = lit(keep_core_geometries)
+
     return config.mosaic_context.invoke_function(
         "mosaicfill",
         pyspark_to_java_column(geom),
         pyspark_to_java_column(resolution),
+        pyspark_to_java_column(keep_core_geometries),
     )

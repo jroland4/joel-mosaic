@@ -23,17 +23,19 @@ Documentation
 =============
 
 .. toctree::
-   :maxdepth: 1
    :caption: Contents:
 
    usage/installation
    usage/quickstart
    usage/grid-indexes
-   usage/join-optimizations
+   usage/automatic-sql-registration
+   usage/kepler
    api/geometry-constructors
    api/geometry-accessors
    api/spatial-functions
+   api/spatial-indexing
    api/spatial-predicates
+   api/spatial-aggregations
 
 
 Indices and tables

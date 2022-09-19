@@ -463,6 +463,10 @@ class MosaicContext(indexSystem: IndexSystem, geometryAPI: GeometryAPI) extends 
         def as_hex(inGeom: Column): Column = ColumnAdapter(AsHex(inGeom.expr))
         def as_json(inGeom: Column): Column = ColumnAdapter(AsJSON(inGeom.expr))
 
+        def get_cdm_structure(binaryFileContent: Column): Column = ColumnAdapter(GetCDMStructure(binaryFileContent.expr))
+        def get_cdm_content(binaryFileContent: Column, variable: String, rank: Int, dType: String): Column =
+            ColumnAdapter(GetCDMContent(binaryFileContent.expr, variable, rank, dType))
+
         /** GeometryAPI Specific */
 
         /** Spatial functions */
